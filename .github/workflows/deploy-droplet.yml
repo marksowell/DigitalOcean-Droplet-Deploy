@@ -87,7 +87,7 @@ jobs:
           else
             echo "Record exists. Updating..."
             doctl compute domain records update "$DOMAIN" "$RECORD_ID" \
-              --record-data "$IP"
+              --data "$IP"
           fi
 
           # Save values for summary
