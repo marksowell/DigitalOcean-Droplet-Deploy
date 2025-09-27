@@ -19,4 +19,5 @@ write_files:
 runcmd:
   - systemctl enable docker
   - systemctl start docker
+  - sleep 10
   - docker compose -f /opt/app/docker-compose.yml up -d
