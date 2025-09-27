@@ -3,7 +3,6 @@ packages:
   - docker.io
   - docker-compose
   - certbot
-  - python3-certbot-nginx
 
 runcmd:
   - systemctl enable docker
@@ -16,25 +15,21 @@ runcmd:
       sleep 15
     done
 
-  # Start nginx in Docker
-  - docker run -d --name nginx-test -p 80:80 -p 443:443 nginx:alpine
-
-  # Wait a bit for container and DNS to propagate
+  # Wait for DNS to propagate
   - sleep 30
 
-  # Run certbot on the host (replace DOMAIN + SUBDOMAIN with actual values via Action envs)
-  - DOMAIN="{{ domain }}"
-  - SUBDOMAIN="{{ subdomain }}"
+  # Request cert
+  - DOMAIN="{{DOMAIN}}"
+  - SUBDOMAIN="{{SUBDOMAIN}}"
   - FQDN="${SUBDOMAIN:+$SUBDOMAIN.}$DOMAIN"
   - certbot certonly --standalone -d "$FQDN" --non-interactive --agree-tos -m admin@"$DOMAIN"
 
-  # Copy certs into container
+  # Copy certs into host path for mounting
   - mkdir -p /etc/nginx/certs
   - cp /etc/letsencrypt/live/$FQDN/fullchain.pem /etc/nginx/certs/fullchain.pem
   - cp /etc/letsencrypt/live/$FQDN/privkey.pem /etc/nginx/certs/privkey.pem
 
-  # Restart nginx container with mounted certs
-  - docker rm -f nginx-test
+  # Run nginx container with SSL
   - |
     docker run -d --name nginx-test \
       -p 80:80 -p 443:443 \
@@ -54,12 +49,12 @@ runcmd:
           ssl_certificate /etc/nginx/certs/fullchain.pem;
           ssl_certificate_key /etc/nginx/certs/privkey.pem;
           location / {
-            return 200 \"Hello, world over HTTPS!\";
+            return 200 \"Hello from HTTPS on $FQDN!\";
           }
         }
       }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
-      
-  # Add deploy hook to restart container after renewal
+
+  # Add deploy hook for auto-renew
   - mkdir -p /etc/letsencrypt/renewal-hooks/deploy
   - |
     cat > /etc/letsencrypt/renewal-hooks/deploy/restart-nginx.sh <<'EOC'
