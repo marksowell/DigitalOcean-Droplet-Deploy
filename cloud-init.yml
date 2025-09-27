@@ -7,3 +7,8 @@ runcmd:
   - echo "Hello from cloud-init" > /opt/app/hello.txt
   - systemctl enable docker
   - systemctl start docker
+# Run Nginx container for testing
+  - docker run -d --name nginx-test \
+      -p 80:80 \
+      -p 443:443 \
+      nginx:latest
