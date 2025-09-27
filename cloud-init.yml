@@ -2,8 +2,13 @@
 packages:
   - docker.io
   - docker-compose
+
 runcmd:
-  - mkdir -p /opt/app
-  - echo "Hello from cloud-init" > /opt/app/hello.txt
   - systemctl enable docker
   - systemctl start docker
+  - |
+    while ! docker info >/dev/null 2>&1; do
+      echo "Docker not ready yet... retrying in 15s"
+      sleep 15
+    done
+    docker run -d --name nginx-test -p 80:80 -p 443:443 nginx:alpine
