@@ -37,6 +37,13 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
+      - name: Prepare cloud-init with domain/subdomain
+        run: |
+          DOMAIN="${{ github.event.inputs.domain }}"
+          SUBDOMAIN="${{ github.event.inputs.subdomain }}"
+          # Replace placeholders {{DOMAIN}} and {{SUBDOMAIN}} in template
+          sed "s/{{DOMAIN}}/$DOMAIN/g; s/{{SUBDOMAIN}}/$SUBDOMAIN/g" cloud-init.yml > cloud-init-final.yml
+
       - name: Create Droplet
         id: droplet
         run: |
@@ -52,7 +59,7 @@ jobs:
             --size "$SIZE" \
             --image "$IMAGE" \
             --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-            --user-data-file cloud-init.yml \
+            --user-data-file cloud-init-final.yml \
             --wait
 
           IP=$(doctl compute droplet list "$HOSTNAME" \

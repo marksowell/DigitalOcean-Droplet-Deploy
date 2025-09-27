@@ -2,13 +2,69 @@
 packages:
   - docker.io
   - docker-compose
+  - certbot
+  - python3-certbot-nginx
 
 runcmd:
   - systemctl enable docker
   - systemctl start docker
+
+  # Wait until Docker is ready
   - |
     while ! docker info >/dev/null 2>&1; do
       echo "Docker not ready yet... retrying in 15s"
       sleep 15
     done
-    docker run -d --name nginx-test -p 80:80 -p 443:443 nginx:alpine
+
+  # Start nginx in Docker
+  - docker run -d --name nginx-test -p 80:80 -p 443:443 nginx:alpine
+
+  # Wait a bit for container and DNS to propagate
+  - sleep 30
+
+  # Run certbot on the host (replace DOMAIN + SUBDOMAIN with actual values via Action envs)
+  - DOMAIN="{{ domain }}"
+  - SUBDOMAIN="{{ subdomain }}"
+  - FQDN="${SUBDOMAIN:+$SUBDOMAIN.}$DOMAIN"
+  - certbot certonly --standalone -d "$FQDN" --non-interactive --agree-tos -m admin@"$DOMAIN"
+
+  # Copy certs into container
+  - mkdir -p /etc/nginx/certs
+  - cp /etc/letsencrypt/live/$FQDN/fullchain.pem /etc/nginx/certs/fullchain.pem
+  - cp /etc/letsencrypt/live/$FQDN/privkey.pem /etc/nginx/certs/privkey.pem
+
+  # Restart nginx container with mounted certs
+  - docker rm -f nginx-test
+  - |
+    docker run -d --name nginx-test \
+      -p 80:80 -p 443:443 \
+      -v /etc/nginx/certs:/etc/nginx/certs:ro \
+      nginx:alpine \
+      sh -c "echo '
+      events {}
+      http {
+        server {
+          listen 80;
+          server_name $FQDN;
+          return 301 https://\$host\$request_uri;
+        }
+        server {
+          listen 443 ssl;
+          server_name $FQDN;
+          ssl_certificate /etc/nginx/certs/fullchain.pem;
+          ssl_certificate_key /etc/nginx/certs/privkey.pem;
+          location / {
+            return 200 \"Hello, world over HTTPS!\";
+          }
+        }
+      }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+      
+  # Add deploy hook to restart container after renewal
+  - mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+  - |
+    cat > /etc/letsencrypt/renewal-hooks/deploy/restart-nginx.sh <<'EOC'
+    #!/bin/bash
+    echo "Cert renewed, restarting nginx-test container..."
+    docker restart nginx-test
+    EOC
+  - chmod +x /etc/letsencrypt/renewal-hooks/deploy/restart-nginx.sh

@@ -27,8 +27,8 @@ You'll need to create the following secrets in your forked repository for the ac
     1. Create A New Personal Access Token and give the token a name.
     2. Choose **Custom Scopes** then the following granular scopes are needed:
        1. ssh_key - read
-       2. droplet - create
-       3. domain - create, update
+       2. droplet - read, create
+       3. domain - read, create, update
 2. **`DIGITALOCEAN_SSH_KEY_ID`**: The DigitalOcean SSH key ID you'd like to use. List your SSH key IDs with ```doctl compute ssh-key list```.
 
 To add these secrets:
@@ -39,7 +39,7 @@ To add these secrets:
 
 ## Creating a Droplet from GitHub Actions
 
-Run from GitHub Actions
+Run from GitHub Actions:
 
 1. Go to Actions → Deploy Droplet → Run workflow
 2. Fill in inputs (domain, subdomain, etc.)
