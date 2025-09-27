@@ -2,13 +2,21 @@
 packages:
   - docker.io
   - docker-compose
+
+write_files:
+  - path: /opt/app/docker-compose.yml
+    permissions: '0644'
+    content: |
+      version: '3'
+      services:
+        nginx:
+          image: nginx:latest
+          container_name: nginx-test
+          ports:
+            - "80:80"
+            - "443:443"
+
 runcmd:
-  - mkdir -p /opt/app
-  - echo "Hello from cloud-init" > /opt/app/hello.txt
   - systemctl enable docker
   - systemctl start docker
-# Run Nginx container for testing
-  - docker run -d --name nginx-test \
-      -p 80:80 \
-      -p 443:443 \
-      nginx:latest
+  - docker compose -f /opt/app/docker-compose.yml up -d
