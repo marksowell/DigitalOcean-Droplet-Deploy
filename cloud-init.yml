@@ -1,19 +1,9 @@
 #cloud-config
+packages:
+  - docker.io
+  - docker-compose
 runcmd:
-  - curl -fsSL https://get.docker.com | sh
+  - mkdir -p /opt/app
+  - echo "Hello from cloud-init" > /opt/app/hello.txt
   - systemctl enable docker
   - systemctl start docker
-  - apt-get install -y docker-compose-plugin
-  - mkdir -p /opt/app
-  - |
-    cat > /opt/app/docker-compose.yml <<'EOC'
-    version: '3'
-    services:
-      nginx:
-        image: nginx:latest
-        container_name: nginx-test
-        ports:
-          - "80:80"
-          - "443:443"
-    EOC
-  - docker compose -f /opt/app/docker-compose.yml up -d
