@@ -76,7 +76,7 @@ jobs:
 
           RECORD_ID=$(doctl compute domain records list "$DOMAIN" \
             --format ID,Type,Name,Data \
-            --no-header | awk -v sub="$SUBDOMAIN" '$2=="A" && $3==sub {print $1}')
+            --no-header | awk -v sname="$SUBDOMAIN" '$2=="A" && $3==sname {print $1}')
 
           if [ -z "$RECORD_ID" ]; then
             echo "Record not found. Creating..."
