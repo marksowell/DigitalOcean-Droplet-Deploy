@@ -1,0 +1,102 @@
+name: Deploy Droplet
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: "Root domain (example.com)"
+        required: true
+      subdomain:
+        description: "Subdomain (e.g., app, www, test). Leave blank for root"
+        required: false
+      region:
+        description: "DigitalOcean region"
+        default: "sfo3"
+        required: false
+      size:
+        description: "Droplet size slug"
+        default: "s-1vcpu-512mb-10gb"
+        required: false
+      image:
+        description: "Droplet image slug"
+        default: "ubuntu-22-04-x64"
+        required: false
+      hostname:
+        description: "Droplet hostname"
+        required: false
+
+jobs:
+  create-droplet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Create Droplet
+        id: droplet
+        run: |
+          REGION="${{ github.event.inputs.region || 'sfo3' }}"
+          SIZE="${{ github.event.inputs.size || 's-1vcpu-512mb-10gb' }}"
+          IMAGE="${{ github.event.inputs.image || 'ubuntu-22-04-x64' }}"
+          HOSTNAME="${{ github.event.inputs.hostname || 'my-droplet' }}"
+
+          echo "Creating droplet: $HOSTNAME ($SIZE, $REGION, $IMAGE)"
+
+          doctl compute droplet create "$HOSTNAME" \
+            --region "$REGION" \
+            --size "$SIZE" \
+            --image "$IMAGE" \
+            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
+            --user-data-file cloud-init.yml \
+            --wait
+
+          IP=$(doctl compute droplet list "$HOSTNAME" \
+            --format PublicIPv4 --no-header)
+
+          echo "droplet_ip=$IP" >> $GITHUB_OUTPUT
+
+      - name: Create/Update DNS Record
+        id: dns
+        run: |
+          DOMAIN="${{ github.event.inputs.domain }}"
+          SUBDOMAIN="${{ github.event.inputs.subdomain }}"
+          IP="${{ steps.droplet.outputs.droplet_ip }}"
+
+          # Default subdomain to "@" (root) if blank
+          if [ -z "$SUBDOMAIN" ]; then
+            SUBDOMAIN="@"
+          fi
+
+          echo "Updating DNS for $SUBDOMAIN.$DOMAIN -> $IP"
+
+          RECORD_ID=$(doctl compute domain records list "$DOMAIN" \
+            --format ID,Type,Name,Data \
+            --no-header | awk -v sub="$SUBDOMAIN" '$2=="A" && $3==sub {print $1}')
+
+          if [ -z "$RECORD_ID" ]; then
+            echo "Record not found. Creating..."
+            doctl compute domain records create "$DOMAIN" \
+              --record-type A \
+              --record-name "$SUBDOMAIN" \
+              --record-data "$IP"
+          else
+            echo "Record exists. Updating..."
+            doctl compute domain records update "$DOMAIN" "$RECORD_ID" \
+              --record-data "$IP"
+          fi
+
+          # Save values for summary
+          echo "fqdn=$SUBDOMAIN.$DOMAIN" >> $GITHUB_OUTPUT
+
+      - name: Show Summary
+        run: |
+          echo "### ✅ Droplet Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Hostname: \`${{ github.event.inputs.hostname || 'my-droplet' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Public IP: \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- DNS: \`${{ steps.dns.outputs.fqdn }}\` → \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,9 @@
+#cloud-config
+packages:
+  - docker.io
+  - docker-compose
+runcmd:
+  - mkdir -p /opt/app
+  - echo "Hello from cloud-init" > /opt/app/hello.txt
+  - systemctl enable docker
+  - systemctl start docker
