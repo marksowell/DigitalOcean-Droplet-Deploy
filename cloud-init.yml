@@ -44,5 +44,5 @@ runcmd:
     docker run -d --name nginx-test --restart unless-stopped \
       -p 80:80 -p 443:443 \
       -v /srv/nginx/conf.d:/etc/nginx/conf.d:ro \
-      -v /etc/letsencrypt/live/{{FQDN}}:/etc/nginx/certs:ro \
+      -v /etc/letsencrypt:/etc/letsencrypt:ro \
       nginx:alpine
