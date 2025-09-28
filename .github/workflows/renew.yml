@@ -1,0 +1,69 @@
+name: Renew SSL Certificates
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"   # Every 30 days at 03:00 UTC
+  workflow_dispatch:      # Allow manual runs too
+
+jobs:
+  renew-certs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Get Droplet Info
+        id: droplet
+        run: |
+          HOSTNAME="${{ vars.DROPLET_HOSTNAME }}"
+          IP=$(doctl compute droplet list "$HOSTNAME" --format PublicIPv4 --no-header)
+          if [ -z "$IP" ]; then
+            echo "Droplet $HOSTNAME not found!" >&2
+            exit 1
+          fi
+          echo "droplet_ip=$IP" >> $GITHUB_OUTPUT
+
+      - name: Run Certbot with DigitalOcean DNS Plugin
+        run: |
+          mkdir -p ./certs ./do-creds
+          echo "dns_digitalocean_token = ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" > ./do-creds/digitalocean.ini
+          chmod 600 ./do-creds/digitalocean.ini
+
+          FQDN="ss.clientmailservices.com"  # adjust to your domain/subdomain
+
+          docker run --rm \
+            -v $(pwd)/certs:/etc/letsencrypt \
+            -v $(pwd)/do-creds:/etc/letsencrypt/dns-creds:ro \
+            certbot/dns-digitalocean certonly \
+              --dns-digitalocean \
+              --dns-digitalocean-credentials /etc/letsencrypt/dns-creds/digitalocean.ini \
+              -d "$FQDN" \
+              --non-interactive \
+              --agree-tos \
+              -m admin@"clientmailservices.com"
+
+      - name: Copy Certs to Droplet
+        run: |
+          IP="${{ steps.droplet.outputs.droplet_ip }}"
+          FQDN="ss.clientmailservices.com"
+
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            certs/live/$FQDN/fullchain.pem \
+            certs/live/$FQDN/privkey.pem \
+            root@$IP:/etc/nginx/certs/
+
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@$IP \
+            "docker restart nginx-test"
+
+      - name: Show Summary
+        run: |
+          echo "### 🔄 SSL Renewal Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Hostname: \`${{ vars.DROPLET_HOSTNAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Public IP: \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Domain: \`ss.clientmailservices.com\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Next run in ~30 days" >> $GITHUB_STEP_SUMMARY

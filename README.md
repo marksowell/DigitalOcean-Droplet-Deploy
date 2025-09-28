@@ -31,6 +31,10 @@ You'll need to create the following secrets in your forked repository for the ac
        3. domain - read, create, update
 2. **`DIGITALOCEAN_SSH_KEY_ID`**: The DigitalOcean SSH key ID you'd like to use. List your SSH key IDs with ```doctl compute ssh-key list```.
 
+### 3. Variables Setup
+
+1. **`DROPLET_HOSTNAME`**: Your DigitalOcean droplet hostname. Used for the `renew.yml` workflow when updating SSL certificate.
+
 To add these secrets:
 
 1. Go to your forked repository on GitHub.
