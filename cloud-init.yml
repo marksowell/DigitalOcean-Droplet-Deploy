@@ -2,55 +2,30 @@
 packages:
   - docker.io
   - docker-compose
-  - openssl
 
 runcmd:
   - systemctl enable docker
   - systemctl start docker
 
-  # Wait until Docker is ready
+  # Wait for Docker
   - |
     while ! docker info >/dev/null 2>&1; do
       echo "Docker not ready yet... retrying in 15s"
       sleep 15
     done
 
-  # Create placeholder self-signed certs so nginx can start
-  - mkdir -p /etc/nginx/certs
-  - openssl req -x509 -nodes -newkey rsa:2048 \
-      -subj "/CN=localhost" \
-      -keyout /etc/nginx/certs/privkey.pem \
-      -out /etc/nginx/certs/fullchain.pem \
-      -days 1
-
-  # Write nginx config
+  # Prepare config only (no certs yet)
   - mkdir -p /opt/nginx/conf.d
   - |
-    cat > /opt/nginx/conf.d/default.conf <<EOF
+    cat > /opt/nginx/conf.d/default.conf <<'EOF'
     events {}
     http {
       server {
         listen 80;
         server_name _;
-        return 301 https://\$host\$request_uri;
-      }
-      server {
-        listen 443 ssl;
-        server_name _;
-        ssl_certificate /etc/nginx/certs/fullchain.pem;
-        ssl_certificate_key /etc/nginx/certs/privkey.pem;
         location / {
-          return 200 "Hello from placeholder SSL!\n";
+          return 200 "Nginx waiting for SSL certs...\n";
         }
       }
     }
     EOF
-
-  # Run nginx container with mounted certs
-  - |
-    docker run -d --name nginx-test \
-      --restart unless-stopped \
-      -p 80:80 -p 443:443 \
-      -v /etc/nginx/certs:/etc/nginx/certs:ro \
-      -v /opt/nginx/conf.d:/etc/nginx/conf.d:ro \
-      nginx:alpine
