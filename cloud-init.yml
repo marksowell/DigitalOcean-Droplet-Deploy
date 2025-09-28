@@ -2,6 +2,7 @@
 packages:
   - docker.io
   - docker-compose
+  - certbot
 
 runcmd:
   - systemctl enable docker
@@ -12,3 +13,6 @@ runcmd:
       sleep 15
     done
     docker run -d --name nginx-test -p 80:80 -p 443:443 nginx:alpine
+    certbot certonly --standalone --non-interactive --agree-tos \
+      -m {{EMAIL}} \
+      -d {{FQDN}}

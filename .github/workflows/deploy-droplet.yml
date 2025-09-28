@@ -37,6 +37,20 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
+      - name: Prepare cloud-init with vars
+        run: |
+          DOMAIN="${{ github.event.inputs.domain }}"
+          SUBDOMAIN="${{ github.event.inputs.subdomain }}"
+          EMAIL="admin@${DOMAIN}"
+
+          if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "@" ]; then
+            FQDN="$DOMAIN"
+          else
+            FQDN="$SUBDOMAIN.$DOMAIN"
+          fi
+
+          sed "s/{{EMAIL}}/$EMAIL/g; s/{{FQDN}}/$FQDN/g" cloud-init.yml > cloud-init-final.yml
+
       - name: Create Droplet
         id: droplet
         run: |
@@ -52,7 +66,7 @@ jobs:
             --size "$SIZE" \
             --image "$IMAGE" \
             --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-            --user-data-file cloud-init.yml \
+            --user-data-file cloud-init-final.yml \
             --wait
 
           IP=$(doctl compute droplet list "$HOSTNAME" \
