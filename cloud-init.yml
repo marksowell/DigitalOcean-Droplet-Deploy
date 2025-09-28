@@ -2,30 +2,67 @@
 packages:
   - docker.io
   - docker-compose
+  - certbot
+  - python3-certbot-nginx
 
 runcmd:
+  # Ensure Docker is enabled
   - systemctl enable docker
   - systemctl start docker
 
-  # Wait for Docker
+  # Wait until Docker is ready
   - |
     while ! docker info >/dev/null 2>&1; do
       echo "Docker not ready yet... retrying in 15s"
       sleep 15
     done
 
-  # Prepare config only (no certs yet)
-  - mkdir -p /opt/nginx/conf.d
+  # Give DNS a moment to propagate
+  - sleep 30
+
+  # Issue certificate via HTTP-01 challenge (no API token needed)
+  - DOMAIN="{{DOMAIN}}"
+  - SUBDOMAIN="{{SUBDOMAIN}}"
+  - FQDN="${SUBDOMAIN:+$SUBDOMAIN.}$DOMAIN"
+  - certbot certonly --standalone --non-interactive --agree-tos \
+      -m admin@"$DOMAIN" -d "$FQDN"
+
+  # Copy certs into host path for Docker
+  - mkdir -p /etc/nginx/certs
+  - cp /etc/letsencrypt/live/$FQDN/fullchain.pem /etc/nginx/certs/fullchain.pem
+  - cp /etc/letsencrypt/live/$FQDN/privkey.pem /etc/nginx/certs/privkey.pem
+
+  # Run nginx container with HTTPS redirect + hello page
   - |
-    cat > /opt/nginx/conf.d/default.conf <<'EOF'
-    events {}
-    http {
-      server {
-        listen 80;
-        server_name _;
-        location / {
-          return 200 "Nginx waiting for SSL certs...\n";
+    docker run -d --name nginx-test \
+      -p 80:80 -p 443:443 \
+      -v /etc/nginx/certs:/etc/nginx/certs:ro \
+      nginx:alpine \
+      sh -c "echo '
+      events {}
+      http {
+        server {
+          listen 80;
+          server_name $FQDN;
+          return 301 https://\$host\$request_uri;
         }
-      }
-    }
-    EOF
+        server {
+          listen 443 ssl;
+          server_name $FQDN;
+          ssl_certificate /etc/nginx/certs/fullchain.pem;
+          ssl_certificate_key /etc/nginx/certs/privkey.pem;
+          location / {
+            return 200 \"Hello from HTTPS on $FQDN!\";
+          }
+        }
+      }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+
+  # Add deploy hook so container reloads if cert is renewed
+  - mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+  - |
+    cat > /etc/letsencrypt/renewal-hooks/deploy/restart-nginx.sh <<'EOC'
+    #!/bin/bash
+    echo "Cert renewed, restarting nginx-test container..."
+    docker restart nginx-test
+    EOC
+  - chmod +x /etc/letsencrypt/renewal-hooks/deploy/restart-nginx.sh

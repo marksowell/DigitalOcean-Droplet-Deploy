@@ -14,13 +14,16 @@ on:
         default: "sfo3"
         required: false
       size:
-        description: "Droplet size"
+        description: "Droplet size slug"
         default: "s-1vcpu-512mb-10gb"
         required: false
       image:
-        description: "Droplet image"
+        description: "Droplet image slug"
         default: "ubuntu-22-04-x64"
         required: false
+      hostname:
+        description: "Droplet hostname"
+        required: true
 
 jobs:
   create-droplet:
@@ -34,16 +37,19 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Prepare cloud-init
-        run: cp cloud-init.yml cloud-init-final.yml
+      - name: Prepare cloud-init with domain/subdomain
+        run: |
+          DOMAIN="${{ github.event.inputs.domain }}"
+          SUBDOMAIN="${{ github.event.inputs.subdomain }}"
+          sed "s/{{DOMAIN}}/$DOMAIN/g; s/{{SUBDOMAIN}}/$SUBDOMAIN/g" cloud-init.yml > cloud-init-final.yml
 
       - name: Create Droplet
         id: droplet
         run: |
-          REGION="${{ github.event.inputs.region }}"
-          SIZE="${{ github.event.inputs.size }}"
-          IMAGE="${{ github.event.inputs.image }}"
-          HOSTNAME="${{ vars.DROPLET_HOSTNAME }}"
+          REGION="${{ github.event.inputs.region || 'sfo3' }}"
+          SIZE="${{ github.event.inputs.size || 's-1vcpu-512mb-10gb' }}"
+          IMAGE="${{ github.event.inputs.image || 'ubuntu-22-04-x64' }}"
+          HOSTNAME="${{ github.event.inputs.hostname }}"
 
           echo "Creating droplet: $HOSTNAME ($SIZE, $REGION, $IMAGE)"
 
@@ -67,7 +73,9 @@ jobs:
           SUBDOMAIN="${{ github.event.inputs.subdomain }}"
           IP="${{ steps.droplet.outputs.droplet_ip }}"
 
-          if [ -z "$SUBDOMAIN" ]; then SUBDOMAIN="@"; fi
+          if [ -z "$SUBDOMAIN" ]; then
+            SUBDOMAIN="@"
+          fi
 
           echo "Updating DNS for $SUBDOMAIN.$DOMAIN -> $IP"
 
@@ -76,11 +84,13 @@ jobs:
             --no-header | awk -v sname="$SUBDOMAIN" '$2=="A" && $3==sname {print $1}')
 
           if [ -z "$RECORD_ID" ]; then
+            echo "Record not found. Creating..."
             doctl compute domain records create "$DOMAIN" \
               --record-type A \
               --record-name "$SUBDOMAIN" \
               --record-data "$IP"
           else
+            echo "Record exists. Updating..."
             doctl compute domain records update "$DOMAIN" \
               --record-id "$RECORD_ID" \
               --record-data "$IP"
@@ -91,6 +101,7 @@ jobs:
       - name: Show Summary
         run: |
           echo "### ✅ Droplet Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Hostname: \`${{ vars.DROPLET_HOSTNAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Hostname: \`${{ github.event.inputs.hostname }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Public IP: \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- DNS: \`${{ steps.dns.outputs.fqdn }}\` → \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
