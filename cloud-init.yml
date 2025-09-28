@@ -4,6 +4,32 @@ packages:
   - docker-compose
   - certbot
 
+write_files:
+  - path: /srv/nginx/conf.d/default.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      server {
+        listen 80;
+        server_name {{FQDN}};
+        return 301 https://$host$request_uri;
+      }
+
+      server {
+        listen 443 ssl http2;
+        server_name {{FQDN}};
+
+        ssl_certificate /etc/letsencrypt/live/{{FQDN}}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/{{FQDN}}/privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers off;
+
+        location / {
+          return 200 'nginx over HTTPS is working';
+          add_header Content-Type text/plain;
+        }
+      }
+
 runcmd:
   - systemctl enable docker
   - systemctl start docker
@@ -15,7 +41,8 @@ runcmd:
     certbot certonly --standalone --non-interactive --agree-tos \
       -m {{EMAIL}} \
       -d {{FQDN}}
-    docker run -d --name nginx-test \
+    docker run -d --name nginx-test --restart unless-stopped \
       -p 80:80 -p 443:443 \
+      -v /srv/nginx/conf.d:/etc/nginx/conf.d:ro \
       -v /etc/letsencrypt/live/{{FQDN}}:/etc/nginx/certs:ro \
       nginx:alpine
