@@ -75,20 +75,6 @@ Run from GitHub Actions:
    - Auto-renew enabled
 Nginx running, accessible via http(s)://subdomain.domain
 
-## Access Your Site
-
-Once DNS propagates, visit:
-
-```txt
-https://subdomain.domain
-```
-
-It will return a test page:
-
-```html
-nginx over HTTPS is working
-```
-
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
