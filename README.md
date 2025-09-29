@@ -18,7 +18,6 @@ This project automates provisioning a DigitalOcean droplet, bootstrapping it wit
 ## Requirements
 
 - A **DigitalOcean account** with:  
-  - A project where you want the Droplet created  
   - An existing **SSH key** already uploaded (you’ll provide its ID in the secrets)  
 
 - A **domain managed in DigitalOcean DNS**:  
