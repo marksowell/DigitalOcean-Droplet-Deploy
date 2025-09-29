@@ -15,6 +15,25 @@ This project automates provisioning a DigitalOcean droplet, bootstrapping it wit
 - Auto-creates or updates a **DigitalOcean DNS A record** for your domain/subdomain
 - Works with defaults but allows overriding region, size, image, and hostname
 
+## Requirements
+
+- A **DigitalOcean account** with:  
+  - A project where you want the Droplet created  
+  - An existing **SSH key** already uploaded (you’ll provide its ID in the secrets)  
+
+- A **domain managed in DigitalOcean DNS**:  
+  - The GitHub Action automatically creates or updates an **A record** for your chosen subdomain.  
+  - Your domain must already be added to [DigitalOcean’s DNS control panel](https://cloud.digitalocean.com/networking/domains).  
+  - If your domain is currently managed elsewhere (Cloudflare, registrar DNS, etc.), you must first point your domain’s nameservers to DigitalOcean:  
+
+    ```txt
+    ns1.digitalocean.com
+    ns2.digitalocean.com
+    ns3.digitalocean.com
+    ```
+
+- A **GitHub repository fork** with required secrets set up (see [Secrets Setup](#2-secrets-setup)).
+
 ## Usage
 
 ### 1. Fork the Repository
