@@ -2,13 +2,6 @@
 
 This project automates provisioning a DigitalOcean droplet, bootstrapping it with Docker, Let’s Encrypt TLS certificates, and Nginx on ports **80/443**, including creating/updating DNS records. It uses **GitHub Actions** with `doctl` and a `cloud-init.yml` file.
 
-## 1-Click Deploy
-
-You can deploy this droplet with a single click:
-
-[![Deploy Droplet](https://img.shields.io/badge/Deploy-Droplet-blue?logo=digitalocean)](../../actions/workflows/deploy.yml)
-
-
 ## Features
 
 - Deploy a droplet from GitHub Actions with **one click**
