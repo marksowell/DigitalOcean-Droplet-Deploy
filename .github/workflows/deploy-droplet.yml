@@ -106,6 +106,21 @@ jobs:
 
           echo "fqdn=$SUBDOMAIN.$DOMAIN" >> $GITHUB_OUTPUT
 
+      - name: Wait for HTTPS service
+        run: |
+          FQDN="${{ steps.dns.outputs.fqdn }}"
+          echo "Waiting for https://$FQDN to respond..."
+          for i in {1..30}; do
+            if curl -sk --max-time 10 https://$FQDN | grep -q "nginx over HTTPS is working"; then
+              echo "✅ HTTPS is up at https://$FQDN"
+              exit 0
+            fi
+            echo "⏳ Attempt $i/30: HTTPS not ready yet... retrying in 30s"
+            sleep 30
+          done
+          echo "❌ Timeout: HTTPS service did not start in time"
+          exit 1
+
       - name: Show Summary
         run: |
           echo "### ✅ Droplet Deployment Complete" >> $GITHUB_STEP_SUMMARY
@@ -113,3 +128,4 @@ jobs:
           echo "- Hostname: \`${{ github.event.inputs.hostname }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Public IP: \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- DNS: \`${{ steps.dns.outputs.fqdn }}\` → \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- HTTPS: \`https://${{ steps.dns.outputs.fqdn }}\`" >> $GITHUB_STEP_SUMMARY
