@@ -1,14 +1,24 @@
-# DigitalOcean Droplet Template with Cloud-init, Docker, and DNS via GitHub Actions
+# DigitalOcean Droplet Template with Cloud-init, Docker, Certbot, and DNS via GitHub Actions
 
-This project automates provisioning a DigitalOcean droplet, bootstrapping it with Docker + a test container on ports **80/443**, and creating/updating DNS records. It uses **GitHub Actions** with `doctl` and a `cloud-init.yml` file.
+This project automates provisioning a DigitalOcean droplet, bootstrapping it with Docker, Let’s Encrypt TLS certificates, and Nginx on ports **80/443**, including creating/updating DNS records. It uses **GitHub Actions** with `doctl` and a `cloud-init.yml` file.
+
+## 1-Click Deploy
+
+You can deploy this droplet with a single click:
+
+[![Deploy Droplet](https://img.shields.io/badge/Deploy-Droplet-blue?logo=digitalocean)](../../actions/workflows/deploy.yml)
+
 
 ## Features
 
 - Deploy a droplet from GitHub Actions with **one click**
 - Provisioned with **cloud-init**
   - Installs Docker & Docker Compose
+  - Installs Certbot and issues a valid Let’s Encrypt certificate
   - Waits until Docker is ready
   - Launches an **nginx** container on ports 80 and 443
+  - Serves HTTPS using the Let’s Encrypt cert
+  - Auto-renews certs and restarts Nginx after renewal
 - Auto-creates or updates a **DigitalOcean DNS A record** for your domain/subdomain
 - Works with defaults but allows overriding region, size, image, and hostname
 
@@ -25,10 +35,10 @@ You'll need to create the following secrets in your forked repository for the ac
 
 1. **`DIGITALOCEAN_ACCESS_TOKEN`**: Your DigitalOcean API token. You can generate it in your DigitalOcean API settings.
     1. Create A New Personal Access Token and give the token a name.
-    2. Choose **Custom Scopes** then the following granular scopes are needed:
-       1. ssh_key - read
-       2. droplet - read, create
-       3. domain - read, create, update
+    2. Choose **Custom Scopes** then select the following granular scopes:
+       1. `ssh_key:read`
+       2. `droplet:read,create`
+       3. `domain:read,create,update`
 2. **`DIGITALOCEAN_SSH_KEY_ID`**: The DigitalOcean SSH key ID you'd like to use. List your SSH key IDs with ```doctl compute ssh-key list```.
 
 To add these secrets:
@@ -37,14 +47,36 @@ To add these secrets:
 2. Navigate to **Settings** > **Secrets and variables** > **Actions**.
 3. Click **New repository secret** and add `DIGITALOCEAN_ACCESS_TOKEN` then `DIGITALOCEAN_SSH_KEY_ID`.
 
-## Creating a Droplet from GitHub Actions
+## Deploy a Droplet from GitHub Actions
 
 Run from GitHub Actions:
 
 1. Go to Actions → Deploy Droplet → Run workflow
-2. Fill in inputs (domain, subdomain, etc.)
-3. Wait for job to complete
-4. Your droplet will be live with Nginx running, accessible via http(s)://subdomain.domain
+2. Fill in inputs
+   - `domain` (e.g., example.com)
+   - `subdomain` (e.g., app, www, test; leave blank for root)
+   - `hostname` (droplet hostname, required)
+   - Optionally override region, size, or image
+3. Wait for job to complete.
+4. Your droplet will be live with:
+   - Nginx serving HTTP → HTTPS redirect
+   - Valid HTTPS certificate from Let’s Encrypt
+   - Auto-renew enabled
+Nginx running, accessible via http(s)://subdomain.domain
+
+## Access Your Site
+
+Once DNS propagates, visit:
+
+```txt
+https://subdomain.domain
+```
+
+It will return a test page:
+
+```html
+nginx over HTTPS is working
+```
 
 ## Contributing
 
