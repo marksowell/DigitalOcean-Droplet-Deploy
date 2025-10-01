@@ -1,10 +1,3 @@
-<p align="center">
-  <a href="https://www.digitalocean.com">
-    <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" alt="Powered by DigitalOcean" width="200px" />
-  </a>
-</p>
-
-
 # DigitalOcean Droplet Template with Cloud-init, Docker, Certbot, and DNS via GitHub Actions
 
 This project automates provisioning a DigitalOcean droplet, bootstrapping it with Docker, Let’s Encrypt TLS certificates, and Nginx on ports **80/443**, including creating/updating DNS records. It uses **GitHub Actions** with `doctl` and a `cloud-init.yml` file.
@@ -85,4 +78,11 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.  
+  
+  
+<p align="center">
+  <a href="https://www.digitalocean.com">
+    <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" alt="Powered by DigitalOcean" width="200px" />
+  </a>
+</p>
