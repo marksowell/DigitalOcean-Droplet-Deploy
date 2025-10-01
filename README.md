@@ -2,8 +2,8 @@
 
 This project automates provisioning a DigitalOcean droplet, bootstrapping it with Docker, Let’s Encrypt TLS certificates, and Nginx on ports **80/443**, including creating/updating DNS records. It uses **GitHub Actions** with `doctl` and a `cloud-init.yml` file.
 
-<br><br>
-<p>
+<br>
+<p align="center">
   <a href="https://www.digitalocean.com">
     <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" alt="Powered by DigitalOcean" width="200px" />
   </a>
