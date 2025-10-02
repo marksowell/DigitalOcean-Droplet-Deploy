@@ -26,7 +26,7 @@ This GitHub Action provisions a new Droplet, installs Docker, configures Nginx o
 ## Requirements
 
 - A **DigitalOcean account** with:
-  - An existing **SSH key** already uploaded (you’ll provide its ID in the secrets)
+  - An existing **SSH key** already uploaded (you’ll provide its ID in the secrets).
 - A **domain managed in DigitalOcean DNS**:
   - The GitHub Action automatically creates or updates an **A record** for your chosen subdomain.
   - Your domain must already be added to [DigitalOcean’s DNS control panel](https://cloud.digitalocean.com/networking/domains).
@@ -65,20 +65,41 @@ To add these secrets:
 
 ## Deploy a Droplet from GitHub Actions
 
-Run from GitHub Actions:
+After forking this repository into your own GitHub account:
 
-1. Go to Actions → Deploy Droplet → Run workflow
-2. Fill in inputs
-   - `domain` (e.g., example.com)
-   - `subdomain` (e.g., app, www, test; leave blank for root)
-   - `hostname` (droplet hostname, required)
-   - Optionally override region, size, or image
-3. Wait for job to complete.
-4. Your droplet will be live with:
-   - Nginx serving HTTP → HTTPS redirect
-   - Valid HTTPS certificate from Let’s Encrypt
-   - Auto-renew enabled
-Nginx running, accessible via http(s)://subdomain.domain
+1. Go to your forked repo’s **Actions** tab.
+2. Select **Deploy Droplet to DigitalOcean**.  
+3. Click **Run workflow** and fill in the inputs:
+   - `domain` - Root domain (example.com).
+   - `subdomain` - Subdomain (e.g., app, www, test). Leave blank for root.
+   - `hostname` - Droplet hostname.
+   - Optionally override region, size, or image.
+4. Wait for job to complete.
+5. Your droplet will be live with:
+   - Nginx serving HTTP → HTTPS redirect.
+   - Valid HTTPS certificate from Let’s Encrypt.
+   - Auto-renew enabled.
+   - Nginx running, accessible via http(s)://subdomain.domain.
+
+### Alternate Usage: As a GitHub Action
+
+Instead of forking, you can also use this as an Action directly in your own workflows:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Droplet
+        uses: marksowell/DigitalOcean-Droplet-Deploy@v1
+        with:
+          domain: example.com
+          subdomain: app
+          hostname: app-server
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DIGITALOCEAN_SSH_KEY_ID: ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }}
+```
 
 ## Contributing
 
