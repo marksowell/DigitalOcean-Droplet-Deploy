@@ -4,128 +4,38 @@ on:
   workflow_dispatch:
     inputs:
       domain:
-        description: "Root domain (example.com)"
+        description: "Root domain (example.com)."
         required: true
       subdomain:
-        description: "Subdomain (e.g., app, www, test). Leave blank for root"
+        description: "Subdomain (e.g., app, www, test). Leave blank for root."
         required: false
+      hostname:
+        description: "Droplet hostname."
+        required: true
       region:
-        description: "DigitalOcean region"
+        description: "DigitalOcean region (default: sfo3)."
         default: "sfo3"
         required: false
       size:
-        description: "Droplet size slug"
+        description: "Droplet size slug (default: s-1vcpu-512mb-10gb)."
         default: "s-1vcpu-512mb-10gb"
         required: false
       image:
-        description: "Droplet image slug"
+        description: "Droplet image slug (default: ubuntu-22-04-x64)."
         default: "ubuntu-22-04-x64"
         required: false
-      hostname:
-        description: "Droplet hostname"
-        required: true
 
 jobs:
-  create-droplet:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+      - uses: marksowell/DigitalOcean-Droplet-Deploy@v1
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-      - name: Prepare cloud-init with vars
-        run: |
-          DOMAIN="${{ github.event.inputs.domain }}"
-          SUBDOMAIN="${{ github.event.inputs.subdomain }}"
-          EMAIL="admin@${DOMAIN}"
-
-          if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "@" ]; then
-            FQDN="$DOMAIN"
-          else
-            FQDN="$SUBDOMAIN.$DOMAIN"
-          fi
-
-          sed "s/{{EMAIL}}/$EMAIL/g; s/{{FQDN}}/$FQDN/g" cloud-init.yml > cloud-init-final.yml
-
-      - name: Create Droplet
-        id: droplet
-        run: |
-          REGION="${{ github.event.inputs.region || 'sfo3' }}"
-          SIZE="${{ github.event.inputs.size || 's-1vcpu-512mb-10gb' }}"
-          IMAGE="${{ github.event.inputs.image || 'ubuntu-22-04-x64' }}"
-          HOSTNAME="${{ github.event.inputs.hostname }}"
-
-          echo "Creating droplet: $HOSTNAME ($SIZE, $REGION, $IMAGE)"
-
-          doctl compute droplet create "$HOSTNAME" \
-            --region "$REGION" \
-            --size "$SIZE" \
-            --image "$IMAGE" \
-            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-            --user-data-file cloud-init-final.yml \
-            --wait
-
-          IP=$(doctl compute droplet list "$HOSTNAME" \
-            --format PublicIPv4 --no-header)
-
-          echo "droplet_ip=$IP" >> $GITHUB_OUTPUT
-
-      - name: Create/Update DNS Record
-        id: dns
-        run: |
-          DOMAIN="${{ github.event.inputs.domain }}"
-          SUBDOMAIN="${{ github.event.inputs.subdomain }}"
-          IP="${{ steps.droplet.outputs.droplet_ip }}"
-
-          if [ -z "$SUBDOMAIN" ]; then
-            SUBDOMAIN="@"
-          fi
-
-          echo "Updating DNS for $SUBDOMAIN.$DOMAIN -> $IP"
-
-          RECORD_ID=$(doctl compute domain records list "$DOMAIN" \
-            --format ID,Type,Name,Data \
-            --no-header | awk -v sname="$SUBDOMAIN" '$2=="A" && $3==sname {print $1}')
-
-          if [ -z "$RECORD_ID" ]; then
-            echo "Record not found. Creating..."
-            doctl compute domain records create "$DOMAIN" \
-              --record-type A \
-              --record-name "$SUBDOMAIN" \
-              --record-data "$IP"
-          else
-            echo "Record exists. Updating..."
-            doctl compute domain records update "$DOMAIN" \
-              --record-id "$RECORD_ID" \
-              --record-data "$IP"
-          fi
-
-          echo "fqdn=$SUBDOMAIN.$DOMAIN" >> $GITHUB_OUTPUT
-
-      - name: Wait for HTTPS service
-        run: |
-          FQDN="${{ steps.dns.outputs.fqdn }}"
-          echo "Waiting for https://$FQDN to respond..."
-          for i in {1..30}; do
-            if curl -sk --max-time 10 https://$FQDN | grep -q "nginx over HTTPS is working"; then
-              echo "✅ HTTPS is up at https://$FQDN"
-              exit 0
-            fi
-            echo "⏳ Attempt $i/30: HTTPS not ready yet... retrying in 30s"
-            sleep 30
-          done
-          echo "❌ Timeout: HTTPS service did not start in time"
-          exit 1
-
-      - name: Show Summary
-        run: |
-          echo "### ✅ Droplet Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Hostname: \`${{ github.event.inputs.hostname }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Public IP: \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- DNS: \`${{ steps.dns.outputs.fqdn }}\` → \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- HTTPS: \`https://${{ steps.dns.outputs.fqdn }}\`" >> $GITHUB_STEP_SUMMARY
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DIGITALOCEAN_SSH_KEY_ID: ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }}
+          domain: ${{ github.event.inputs.domain }}
+          subdomain: ${{ github.event.inputs.subdomain }}
+          hostname: ${{ github.event.inputs.hostname }}
+          region: ${{ github.event.inputs.region }}
+          size: ${{ github.event.inputs.size }}
+          image: ${{ github.event.inputs.image }}

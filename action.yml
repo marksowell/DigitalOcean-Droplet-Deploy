@@ -1,34 +1,35 @@
-name: "Deploy Droplet to DigitalOcean Action"
-description: "Provision a DigitalOcean Droplet with Docker, Nginx, SSL (Let's Encrypt), and auto DNS updates."
+name: "DigitalOcean Droplet Deploy"
+description: "Deploy a DigitalOcean Droplet with Docker, Nginx, and automatic HTTPS."
+author: marksowell
 branding:
-  icon: "cloud"
+  icon: "droplet"
   color: "blue"
 
 inputs:
   DIGITALOCEAN_ACCESS_TOKEN:
-    description: "DigitalOcean API token"
+    description: "DigitalOcean API token."
     required: true
   DIGITALOCEAN_SSH_KEY_ID:
-    description: "DigitalOcean SSH key ID"
+    description: "DigitalOcean SSH key ID."
     required: true
   domain:
-    description: "Root domain (example.com)"
+    description: "Root domain (example.com)."
     required: true
   subdomain:
-    description: "Subdomain (leave blank for root)"
+    description: "Subdomain (e.g., app, www, test). Leave blank for root."
     required: false
+  hostname:
+    description: "Droplet hostname."
+    required: true
   region:
-    description: "DigitalOcean region (e.g., sfo3)"
+    description: "DigitalOcean region (default: sfo3)."
     default: "sfo3"
   size:
-    description: "Droplet size slug"
+    description: "Droplet size slug (default: s-1vcpu-512mb-10gb)."
     default: "s-1vcpu-512mb-10gb"
   image:
-    description: "Droplet image slug"
+    description: "Droplet image slug (default: ubuntu-22-04-x64)."
     default: "ubuntu-22-04-x64"
-  hostname:
-    description: "Droplet hostname"
-    required: true
 
 runs:
   using: "composite"
@@ -55,6 +56,7 @@ runs:
         fi
 
         sed "s/{{EMAIL}}/$EMAIL/g; s/{{FQDN}}/$FQDN/g" cloud-init.yml > cloud-init-final.yml
+        echo "fqdn=$FQDN" >> $GITHUB_OUTPUT
 
     - name: Create Droplet
       id: droplet
@@ -65,6 +67,8 @@ runs:
         IMAGE="${{ inputs.image }}"
         HOSTNAME="${{ inputs.hostname }}"
 
+        echo "Creating droplet: $HOSTNAME ($SIZE, $REGION, $IMAGE)"
+
         doctl compute droplet create "$HOSTNAME" \
           --region "$REGION" \
           --size "$SIZE" \
@@ -73,9 +77,7 @@ runs:
           --user-data-file cloud-init-final.yml \
           --wait
 
-        IP=$(doctl compute droplet list "$HOSTNAME" \
-          --format PublicIPv4 --no-header)
-
+        IP=$(doctl compute droplet list "$HOSTNAME" --format PublicIPv4 --no-header)
         echo "droplet_ip=$IP" >> $GITHUB_OUTPUT
 
     - name: Create/Update DNS Record
@@ -90,16 +92,20 @@ runs:
           SUBDOMAIN="@"
         fi
 
+        echo "Updating DNS for $SUBDOMAIN.$DOMAIN -> $IP"
+
         RECORD_ID=$(doctl compute domain records list "$DOMAIN" \
           --format ID,Type,Name,Data \
           --no-header | awk -v sname="$SUBDOMAIN" '$2=="A" && $3==sname {print $1}')
 
         if [ -z "$RECORD_ID" ]; then
+          echo "Record not found. Creating..."
           doctl compute domain records create "$DOMAIN" \
             --record-type A \
             --record-name "$SUBDOMAIN" \
             --record-data "$IP"
         else
+          echo "Record exists. Updating..."
           doctl compute domain records update "$DOMAIN" \
             --record-id "$RECORD_ID" \
             --record-data "$IP"
@@ -111,11 +117,24 @@ runs:
       shell: bash
       run: |
         FQDN="${{ steps.dns.outputs.fqdn }}"
+        echo "Waiting for https://$FQDN to respond..."
         for i in {1..30}; do
           if curl -sk --max-time 10 https://$FQDN | grep -q "nginx over HTTPS is working"; then
             echo "✅ HTTPS is up at https://$FQDN"
             exit 0
           fi
+          echo "⏳ Attempt $i/30: HTTPS not ready yet... retrying in 30s"
           sleep 30
         done
+        echo "❌ Timeout: HTTPS service did not start in time"
         exit 1
+
+    - name: Show Summary
+      shell: bash
+      run: |
+        echo "### ✅ Droplet Deployment Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Hostname: \`${{ inputs.hostname }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Public IP: \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- DNS: \`${{ steps.dns.outputs.fqdn }}\` → \`${{ steps.droplet.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- HTTPS: \`https://${{ steps.dns.outputs.fqdn }}\`" >> $GITHUB_STEP_SUMMARY
