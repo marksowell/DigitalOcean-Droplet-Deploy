@@ -63,7 +63,7 @@ To add these secrets:
 2. Navigate to **Settings** > **Secrets and variables** > **Actions**.
 3. Click **New repository secret** and add `DIGITALOCEAN_ACCESS_TOKEN` then `DIGITALOCEAN_SSH_KEY_ID`.
 
-### 3. Run the Included Workflow (fork & click)
+### 3. Run the Included Workflow
 
 After forking this repository into your own GitHub account:
 
