@@ -63,7 +63,7 @@ To add these secrets:
 2. Navigate to **Settings** > **Secrets and variables** > **Actions**.
 3. Click **New repository secret** and add `DIGITALOCEAN_ACCESS_TOKEN` then `DIGITALOCEAN_SSH_KEY_ID`.
 
-## Deploy a Droplet from GitHub Actions
+### 3. Run the Included Workflow (fork & click)
 
 After forking this repository into your own GitHub account:
 
@@ -81,7 +81,7 @@ After forking this repository into your own GitHub account:
    - Auto-renew enabled.
    - Nginx running, accessible via http(s)://subdomain.domain.
 
-### Alternate Usage: As a GitHub Action
+### Alternate Usage: Use as a GitHub Action in Your Own Workflow
 
 Instead of forking, you can also use this as an Action directly in your own workflows:
 
