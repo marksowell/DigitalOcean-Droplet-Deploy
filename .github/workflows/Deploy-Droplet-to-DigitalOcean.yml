@@ -1,4 +1,4 @@
-name: Deploy Droplet
+name: Deploy Droplet to DigitalOcean
 
 on:
   workflow_dispatch:

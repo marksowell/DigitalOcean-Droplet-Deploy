@@ -1,6 +1,6 @@
 # DigitalOcean Droplet Template with Cloud-init, Docker, Certbot, and DNS via GitHub Actions
 
-This project automates provisioning a DigitalOcean droplet, bootstrapping it with Docker, Let’s Encrypt TLS certificates, and Nginx on ports **80/443**, including creating/updating DNS records. It uses **GitHub Actions** with `doctl` and a `cloud-init.yml` file.
+Deploy a DigitalOcean Droplet with Docker, Nginx, and automatic HTTPS. This GitHub Actions workflow template provisions a new Droplet, installs Docker, configures Nginx on ports 80/443 with free Let’s Encrypt TLS certificates, and creates/updates DNS records in DigitalOcean automatically.
 
 <br>
 <p>
@@ -12,6 +12,7 @@ This project automates provisioning a DigitalOcean droplet, bootstrapping it wit
 ## Features
 
 - Deploy a droplet from GitHub Actions with **one click**
+- Uses `doctl` and a `cloud-init.yml` file
 - Provisioned with **cloud-init**
   - Installs Docker & Docker Compose
   - Installs Certbot and issues a valid Let’s Encrypt certificate
