@@ -1,0 +1,121 @@
+name: "Deploy Droplet to DigitalOcean Action"
+description: "Provision a DigitalOcean Droplet with Docker, Nginx, SSL (Let's Encrypt), and auto DNS updates."
+branding:
+  icon: "cloud"
+  color: "blue"
+
+inputs:
+  DIGITALOCEAN_ACCESS_TOKEN:
+    description: "DigitalOcean API token"
+    required: true
+  DIGITALOCEAN_SSH_KEY_ID:
+    description: "DigitalOcean SSH key ID"
+    required: true
+  domain:
+    description: "Root domain (example.com)"
+    required: true
+  subdomain:
+    description: "Subdomain (leave blank for root)"
+    required: false
+  region:
+    description: "DigitalOcean region (e.g., sfo3)"
+    default: "sfo3"
+  size:
+    description: "Droplet size slug"
+    default: "s-1vcpu-512mb-10gb"
+  image:
+    description: "Droplet image slug"
+    default: "ubuntu-22-04-x64"
+  hostname:
+    description: "Droplet hostname"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ inputs.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: Prepare cloud-init with vars
+      shell: bash
+      run: |
+        DOMAIN="${{ inputs.domain }}"
+        SUBDOMAIN="${{ inputs.subdomain }}"
+        EMAIL="admin@${DOMAIN}"
+
+        if [ -z "$SUBDOMAIN" ] || [ "$SUBDOMAIN" = "@" ]; then
+          FQDN="$DOMAIN"
+        else
+          FQDN="$SUBDOMAIN.$DOMAIN"
+        fi
+
+        sed "s/{{EMAIL}}/$EMAIL/g; s/{{FQDN}}/$FQDN/g" cloud-init.yml > cloud-init-final.yml
+
+    - name: Create Droplet
+      id: droplet
+      shell: bash
+      run: |
+        REGION="${{ inputs.region }}"
+        SIZE="${{ inputs.size }}"
+        IMAGE="${{ inputs.image }}"
+        HOSTNAME="${{ inputs.hostname }}"
+
+        doctl compute droplet create "$HOSTNAME" \
+          --region "$REGION" \
+          --size "$SIZE" \
+          --image "$IMAGE" \
+          --ssh-keys ${{ inputs.DIGITALOCEAN_SSH_KEY_ID }} \
+          --user-data-file cloud-init-final.yml \
+          --wait
+
+        IP=$(doctl compute droplet list "$HOSTNAME" \
+          --format PublicIPv4 --no-header)
+
+        echo "droplet_ip=$IP" >> $GITHUB_OUTPUT
+
+    - name: Create/Update DNS Record
+      id: dns
+      shell: bash
+      run: |
+        DOMAIN="${{ inputs.domain }}"
+        SUBDOMAIN="${{ inputs.subdomain }}"
+        IP="${{ steps.droplet.outputs.droplet_ip }}"
+
+        if [ -z "$SUBDOMAIN" ]; then
+          SUBDOMAIN="@"
+        fi
+
+        RECORD_ID=$(doctl compute domain records list "$DOMAIN" \
+          --format ID,Type,Name,Data \
+          --no-header | awk -v sname="$SUBDOMAIN" '$2=="A" && $3==sname {print $1}')
+
+        if [ -z "$RECORD_ID" ]; then
+          doctl compute domain records create "$DOMAIN" \
+            --record-type A \
+            --record-name "$SUBDOMAIN" \
+            --record-data "$IP"
+        else
+          doctl compute domain records update "$DOMAIN" \
+            --record-id "$RECORD_ID" \
+            --record-data "$IP"
+        fi
+
+        echo "fqdn=$SUBDOMAIN.$DOMAIN" >> $GITHUB_OUTPUT
+
+    - name: Wait for HTTPS service
+      shell: bash
+      run: |
+        FQDN="${{ steps.dns.outputs.fqdn }}"
+        for i in {1..30}; do
+          if curl -sk --max-time 10 https://$FQDN | grep -q "nginx over HTTPS is working"; then
+            echo "✅ HTTPS is up at https://$FQDN"
+            exit 0
+          fi
+          sleep 30
+        done
+        exit 1
