@@ -46,3 +46,7 @@ runcmd:
       -v /srv/nginx/conf.d:/etc/nginx/conf.d:ro \
       -v /etc/letsencrypt:/etc/letsencrypt:ro \
       nginx:alpine
+    mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+    echo '#!/bin/bash' > /etc/letsencrypt/renewal-hooks/deploy/restart-nginx-test.sh
+    echo 'docker restart nginx-test' >> /etc/letsencrypt/renewal-hooks/deploy/restart-nginx-test.sh
+    chmod +x /etc/letsencrypt/renewal-hooks/deploy/restart-nginx-test.sh
