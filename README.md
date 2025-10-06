@@ -76,7 +76,7 @@ After forking this repository into your own GitHub account:
    - Optionally override region, size, or image.
 4. Wait for job to complete.
 5. Your droplet will be live with:
-   - Nginx serving HTTP → HTTPS redirect.
+   - HTTP → HTTPS redirect.
    - Valid HTTPS certificate from Let’s Encrypt.
    - Auto-renew enabled.
    - Nginx running, accessible via http(s)://subdomain.domain.
