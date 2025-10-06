@@ -1,6 +1,6 @@
 # DigitalOcean Droplet Deploy GitHub Action
 
-This GitHub Action deploys a **DigitalOcean Droplet** with Docker and an **Nginx** container on ports 80/443. It automatically creates free Let’s Encrypt TLS certificates and manages DNS records in DigitalOcean.
+This GitHub Action deploys a **DigitalOcean Droplet** with Docker and an **Nginx** container on ports 80 and 443. It automatically creates free Let’s Encrypt TLS certificates and manages DNS records in DigitalOcean.
 
 <br>
 <p>
